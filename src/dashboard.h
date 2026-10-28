@@ -385,7 +385,22 @@ body.dangerAlarm::before{content:"MOTOR TEMPERATURE DANGER";position:fixed;z-ind
     document.body.classList.remove("dangerAlarm");
 
     if (!state.tempOnline || !Number.isFinite(state.tempC)) {
-      alarm.textContent = "TEMP SENSOR OFFLINE";
+      $("tempValue").style.color = "var(--muted)";
+
+      if (state.recording) {
+        card.classList.add("danger");
+        alarm.classList.add("danger");
+        alarm.textContent = "DANGER / TEMP SENSOR LOST";
+
+        if (state.soundEnabled && now - state.lastAlarmSoundAt > 1800) {
+          beep(520, 220, 0.11);
+          setTimeout(() => beep(520, 220, 0.11), 320);
+          state.lastAlarmSoundAt = now;
+        }
+      } else {
+        alarm.textContent = "TEMP SENSOR OFFLINE";
+      }
+
       return;
     }
 
