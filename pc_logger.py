@@ -26,6 +26,8 @@ COLUMNS = (
     "thrust_kgf",
     "thrust_lbf",
     "thrust_N",
+    "motor_temp_C",
+    "motor_temp_F",
     "quality",
 )
 
@@ -140,7 +142,9 @@ class Logger:
                 self.finish("A new run began before the previous CSV finalized.")
 
             self.last_run = run
-            self.begin(status)
+
+            if status["recording"]:
+                self.begin(status)
 
         if self.active_run is None:
             return
@@ -162,7 +166,11 @@ class Logger:
         points = batch.get("points", [])
 
         for record in points:
-            seq, timestamp_ms, gf, raw = record
+            if len(record) < 4:
+                continue
+
+            seq, timestamp_ms, gf, raw = record[:4]
+            temp_c = record[4] if len(record) >= 5 else None
 
             seq = int(seq)
             timestamp_ms = int(timestamp_ms)
@@ -185,8 +193,15 @@ class Logger:
                 )
 
             self.cursor = seq
-
             elapsed_ms = (timestamp_ms - self.start_ms) & 0xFFFFFFFF
+
+            if temp_c is None:
+                temp_c_text = ""
+                temp_f_text = ""
+            else:
+                temp_c_value = float(temp_c)
+                temp_c_text = f"{temp_c_value:.2f}"
+                temp_f_text = f"{temp_c_value * 9.0 / 5.0 + 32.0:.2f}"
 
             self.writer.writerow(
                 (
@@ -200,6 +215,8 @@ class Logger:
                     f"{gf / 1000:.6f}",
                     f"{gf / 453.59237:.6f}",
                     f"{gf * 0.00980665:.6f}",
+                    temp_c_text,
+                    temp_f_text,
                     "gap_before" if missing else "ok",
                 )
             )
@@ -277,7 +294,7 @@ class Logger:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Record ESP32 HX711 thrust samples over Wi-Fi."
+        description="Record ESP32 HX711 thrust and motor temperature samples over Wi-Fi."
     )
 
     parser.add_argument(
